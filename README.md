@@ -14,4 +14,4 @@ To install the dataset in the `data` folder, run the script `python dataset.py`.
 The loading of the data is performed in the `dataset.py` file.
 The different models used are stored in `models.py`. 
 
-The script `classifiy.py` trains a classifier using the labels of the validation dataset.
+The script `classif.py` trains a classifier using the labels of the validation dataset.

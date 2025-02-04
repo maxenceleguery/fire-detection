@@ -16,12 +16,18 @@ def train_parser():
     parser.add_argument("--bs", type=int, help="batch size", default=256)
     parser.add_argument("--epochs", type=int, help="Number of epochs", default=10)
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
+    parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
     return parser
 
 
 def main(kwargs: Namespace) -> None:
     train_load, _, val_load = get_dataloaders(batch_size=kwargs.bs)
     model = CNN().cuda()
+    if kwargs.checkpoint:
+        print("loading checkpoint...")
+        state_dict = torch.load(kwargs.checkpoint, map_location="cuda", weights_only=True)
+        model.load_state_dict(state_dict)
+    
     ctx = Namespace(
         num_epochs=kwargs.epochs,
         verbose=kwargs.verbose,
@@ -31,14 +37,26 @@ def main(kwargs: Namespace) -> None:
         train_losses=[],
     )
 
+    best_model, best_loss = None, float('inf')
     for epoch in range(kwargs.epochs):
         train(epoch, model, ctx)
-        test(epoch, model, ctx)
+        loss = test(epoch, model, ctx)
+
+        # save best model
+        if loss < best_loss:
+            best_model = model.state_dict().copy()
+            best_loss = loss
+            
 
     id_ = uuid.uuid4().fields[0]
     (workspace := Path("training")).mkdir(exist_ok=True)
     print(f"Saving training data to '{workspace}' folder with id {id_}...")
+
+    # save loss
     pd.Series(ctx.train_losses).to_csv(workspace / f"train_loss-{id_}.csv")
+    # save model
+    if best_model is not None:
+        torch.save(best_model, workspace / f"classifier-{id_}.pt")
 
 
 def train(epoch: int, model: nn.Module, ctx: Namespace):
@@ -65,22 +83,25 @@ def train(epoch: int, model: nn.Module, ctx: Namespace):
             pbar.set_postfix_str(f"loss={loss.item():.4f}")
         elif i%5 == 0:
             print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Iter [{i+1}/] Train loss : {loss.item():.3f}")
-    print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Train acc : {100 - 100.*wrong/total:.2f}")
+    print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Train acc={100 - 100.*wrong/total:.2f}")
 
 
 @torch.no_grad()
 def test(epoch: int, model: nn.Module, ctx: Namespace):
-    total = wrong = 0
+    total = wrong = loss = 0
     for images, labels in tqdm(ctx.val_loader, disable=not ctx.verbose):
         images, labels = images.cuda(), labels.cuda()
         out = model(images)
+        loss += ctx.criterion(out, labels).item() * images.shape[0]
 
         predictions = torch.argmax(out, dim=1)
         incorrect_indices = (predictions.squeeze() != labels).nonzero().squeeze()
 
         total += predictions.shape[0]
         wrong += incorrect_indices.shape[0]
-    print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Val acc : {100 - 100.*wrong/total:.2f}")
+    loss /= total
+    print(f"Epoch [{epoch+1}/{ctx.num_epochs}], Val acc={100 - 100.*wrong/total:.2f}, {loss=:.4f}")
+    return loss
 
 
 if __name__ == "__main__":
