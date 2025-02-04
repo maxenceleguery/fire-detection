@@ -14,7 +14,7 @@ def train_parser():
     parser = ArgumentParser()
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--bs", type=int, help="batch size", default=256)
-    parser.add_argument("--epochs", type=int, help="Number of epochs")
+    parser.add_argument("--epochs", type=int, help="Number of epochs", default=10)
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     return parser
 
