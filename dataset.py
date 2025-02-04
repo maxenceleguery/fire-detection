@@ -4,7 +4,7 @@ from torchvision.datasets import ImageFolder
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data import random_split
 from torch import Generator
-
+from typing import List
 
 def download():
     if not os.path.exists("./data/test/wildfire/-59.03238,51.85132.jpg"):
@@ -28,7 +28,7 @@ class TrainDataset(ImageFolder):
 
 
 # Create an ImageFolder dataset
-def make_datasets(paths: list[str], resize: int=350):
+def make_datasets(paths: List[str], resize: int=350):
     t = T.Compose([ T.Resize(resize), T.ToTensor() ])
     return [
         (TrainDataset if "train" in path else ImageFolder)(root=path, transform=t) 
