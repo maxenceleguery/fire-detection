@@ -78,7 +78,8 @@ def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
         incorrect_indices = (predictions.squeeze() != labels).nonzero().squeeze()
 
         total += predictions.shape[0]
-        wrong += incorrect_indices.shape[0]
+        if len(incorrect_indices.shape) > 0:
+            wrong += incorrect_indices.shape[0]
 
         ctx.optimizer.zero_grad()
         loss = ctx.criterion(out, labels)
@@ -110,7 +111,8 @@ def test(epoch: int, model: nn.Module, ctx: Namespace, val: bool=True) -> float:
         incorrect_indices = (predictions.squeeze() != labels).nonzero().squeeze()
 
         total += predictions.shape[0]
-        wrong += incorrect_indices.shape[0]
+        if len(incorrect_indices.shape) > 0:
+            wrong += incorrect_indices.shape[0]
     loss /= total
     acc = 100 - 100.*wrong/total
     print(val_, f"epoch [{epoch+1}/{ctx.num_epochs}], acc={acc:.2f}, {loss=:.4f}")

@@ -6,6 +6,9 @@ from torch.utils.data import random_split
 from torch import Generator
 from typing import List
 
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
 def download():
     if not os.path.exists("./data/test/wildfire/-59.03238,51.85132.jpg"):
         from kaggle.api.kaggle_api_extended import KaggleApi
