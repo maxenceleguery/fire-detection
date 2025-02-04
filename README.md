@@ -14,4 +14,4 @@ To install the dataset in the `data` folder, run the script `python dataset.py`.
 The loading of the data is performed in the `dataset.py` file.
 The different models used are stored in `models.py`. 
 
-The script `classif.py` trains a classifier using the labels of the validation dataset.
+The script `classif.py` trains a classifier using the labels of the validation dataset. To load a model to be trained, use the `--checkpoint` argument to provide the path to the model weights. To only test a model, one can use the argument `--epochs 0`. 

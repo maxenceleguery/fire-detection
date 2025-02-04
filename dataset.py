@@ -37,7 +37,7 @@ def make_datasets(paths: list[str], resize: int=350):
 
 
 def get_dataloaders(batch_size: int=256, split: float=0.7, num_workers: int=4, resize: int=350, seed: int=777):
-    """Load train dataset as a subset of the validation set."""
+    """Load train dataset as a subset of the validation set. Returns (train, test, val) loaders."""
 
     test_dataset, valid_dataset = make_datasets([test_path, valid_path], resize)
     new_train_dataset, new_valid_dataset = random_split(valid_dataset, (split, (1-split)), Generator().manual_seed(seed))
@@ -52,7 +52,7 @@ def get_dataloaders(batch_size: int=256, split: float=0.7, num_workers: int=4, r
 def get_unsupervised_train(batch_size: int=256, num_workers: int=4, resize: int=350):
     """Get the training dataset while removing the labels."""
     
-    train_dataset = make_datasets((train_path,), resize)
+    train_dataset = make_datasets([train_path], resize)
     assert type(train_dataset) is TrainDataset, "The training dataset should not use any labels."
     return DataLoader(train_dataset, batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
 

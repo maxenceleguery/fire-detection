@@ -20,8 +20,8 @@ def train_parser():
     return parser
 
 
-def main(kwargs: Namespace) -> None:
-    train_load, _, val_load = get_dataloaders(batch_size=kwargs.bs)
+def main(kwargs: Namespace) -> float:
+    train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs)
     model = CNN().cuda()
     if kwargs.checkpoint:
         print("loading checkpoint...")
@@ -33,7 +33,7 @@ def main(kwargs: Namespace) -> None:
         verbose=kwargs.verbose,
         optimizer=torch.optim.Adam(model.parameters(), kwargs.lr),
         criterion=nn.CrossEntropyLoss(),
-        train_loader=train_load, val_loader=val_load ,
+        train_loader=train_load, test_loader=test_load, val_loader=val_load,
         train_losses=[],
     )
 
@@ -46,23 +46,30 @@ def main(kwargs: Namespace) -> None:
         if loss < best_loss:
             best_model = model.state_dict().copy()
             best_loss = loss
-            
 
-    id_ = uuid.uuid4().fields[0]
-    (workspace := Path("training")).mkdir(exist_ok=True)
-    print(f"Saving training data to '{workspace}' folder with id {id_}...")
+    # only perform test if no epochs
+    if kwargs.epochs > 0:
+        id_ = uuid.uuid4().fields[0]
+        (workspace := Path("training")).mkdir(exist_ok=True)
+        print(f"Saving training data to '{workspace}' folder with id {id_}...")
 
-    # save loss
-    pd.Series(ctx.train_losses).to_csv(workspace / f"train_loss-{id_}.csv")
-    # save model
-    if best_model is not None:
-        torch.save(best_model, workspace / f"classifier-{id_}.pt")
+        # save loss
+        pd.Series(ctx.train_losses).to_csv(workspace / f"train_loss-{id_}.csv")
+        # save model
+        if best_model is not None:
+            torch.save(best_model, workspace / f"classifier-{id_}.pt")
+            print("load best model...")
+            model.load_state_dict(best_model)
+    
+    return test(1, model, ctx, val=False)  # FIXME: #1 error while doing test
 
 
-def train(epoch: int, model: nn.Module, ctx: Namespace):
-    total = wrong = 0
+def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
+    """Training loop."""
+
     model.train()
-    pbar = tqdm(ctx.train_loader, disable=not ctx.verbose)
+    total = wrong = 0
+    pbar = tqdm(ctx.train_loader, disable=not ctx.verbose, desc="Train")
     for i, (images, labels) in enumerate(pbar):
         images, labels = images.cuda(), labels.cuda()
         out = model(images)
@@ -83,13 +90,18 @@ def train(epoch: int, model: nn.Module, ctx: Namespace):
             pbar.set_postfix_str(f"loss={loss.item():.4f}")
         elif i%5 == 0:
             print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Iter [{i+1}/] Train loss : {loss.item():.3f}")
-    print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Train acc={100 - 100.*wrong/total:.2f}")
+    print(f"Train epoch [{epoch+1}/{ctx.num_epochs}] acc={100 - 100.*wrong/total:.2f}")
 
 
 @torch.no_grad()
-def test(epoch: int, model: nn.Module, ctx: Namespace):
+def test(epoch: int, model: nn.Module, ctx: Namespace, val: bool=True) -> float:
+    """Evaluation loop."""
+
+    model.eval()
     total = wrong = loss = 0
-    for images, labels in tqdm(ctx.val_loader, disable=not ctx.verbose):
+    loader = ctx.val_loader if val else ctx.test_loader
+    val_ = "Val" if val else "Test"
+    for images, labels in tqdm(loader, disable=not ctx.verbose, desc=val_):
         images, labels = images.cuda(), labels.cuda()
         out = model(images)
         loss += ctx.criterion(out, labels).item() * images.shape[0]
@@ -100,7 +112,8 @@ def test(epoch: int, model: nn.Module, ctx: Namespace):
         total += predictions.shape[0]
         wrong += incorrect_indices.shape[0]
     loss /= total
-    print(f"Epoch [{epoch+1}/{ctx.num_epochs}], Val acc={100 - 100.*wrong/total:.2f}, {loss=:.4f}")
+    acc = 100 - 100.*wrong/total
+    print(val_, f"epoch [{epoch+1}/{ctx.num_epochs}], acc={acc:.2f}, {loss=:.4f}")
     return loss
 
 
