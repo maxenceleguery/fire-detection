@@ -55,7 +55,7 @@ def get_dataloaders(batch_size: int=256, split: float=0.7, num_workers: int=4, r
 def get_unsupervised_train(batch_size: int=256, num_workers: int=4, resize: int=350):
     """Get the training dataset while removing the labels."""
     
-    train_dataset = make_datasets([train_path], resize)
+    train_dataset = make_datasets([train_path], resize)[0]
     assert type(train_dataset) is TrainDataset, "The training dataset should not use any labels."
     return DataLoader(train_dataset, batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
 
