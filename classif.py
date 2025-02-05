@@ -7,7 +7,7 @@ import torch.nn as nn
 import pandas as pd
 
 from dataset import get_dataloaders
-from models import CNN
+from models import CNN, Resnet50
 
 
 def train_parser():
@@ -15,14 +15,19 @@ def train_parser():
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--bs", type=int, help="batch size", default=256)
     parser.add_argument("--epochs", type=int, help="Number of epochs", default=10)
+    parser.add_argument("--resize", type=int, help="Resize", default=350)
+    parser.add_argument("--model", type=str, default="CNN", choices=["CNN", "resnet50"], help="Model")
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
     return parser
 
 
 def main(kwargs: Namespace) -> float:
-    train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs)
-    model = CNN().cuda()
+    train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs, resize=kwargs.resize)
+    if kwargs.model == "CNN":
+        model = CNN().cuda()
+    elif kwargs.model == "resnet50":
+        model = Resnet50().cuda()
     if kwargs.checkpoint:
         print("loading checkpoint...")
         state_dict = torch.load(kwargs.checkpoint, map_location="cuda", weights_only=True)

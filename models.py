@@ -1,8 +1,9 @@
 from torch import nn
+from torchvision.models.resnet import resnet50, ResNet50_Weights
 
 class CNN(nn.Module):
     def __init__(self):
-        super(CNN, self).__init__() # why is this necessary?
+        super(CNN, self).__init__()
         self.network = nn.Sequential(
             nn.Conv2d(in_channels = 3, out_channels = 8, kernel_size=2, stride=1, padding=1),
             nn.BatchNorm2d(8),
@@ -21,12 +22,26 @@ class CNN(nn.Module):
             nn.Linear(in_features=61952, out_features=256),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(in_features=256, out_features=2), # last unit has 
+            nn.Linear(in_features=256, out_features=2),
             nn.Sigmoid()
         )
         
     def forward(self, x):
         return self.network(x)
+    
+class Resnet50(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.base = resnet50(weights = ResNet50_Weights.IMAGENET1K_V2)
+
+        self.base.fc = nn.Sequential(
+            nn.Linear(in_features=self.base.fc.in_features, out_features=2),
+            nn.Sigmoid()
+        )
+    
+    def forward(self, x):
+        return self.base(x)
 
 class ResNetBlock(nn.Module):
     """A class to represent ResNet Blocks"""
