@@ -7,19 +7,19 @@ import torch.nn as nn
 import pandas as pd
 
 from dataset import get_dataloaders, get_unsupervised_train
-from models import AutoEncoder, MLP
+from models import AutoEncoder, EncoderMLP
 
 
 def train_parser():
     parser = ArgumentParser()
     parser.add_argument("--lr_ae", type=float, default=1e-3)
-    parser.add_argument("--lr_mlp", type=float, default=1e-3)
+    parser.add_argument("--lr_emlp", type=float, default=1e-3)
     parser.add_argument("--bs", type=int, help="batch size", default=256)
     parser.add_argument("--epochs_ae", type=int, help="Number of epochs AE", default=10)
-    parser.add_argument("--epochs_mlp", type=int, help="Number of epochs MLP", default=15)
+    parser.add_argument("--epochs_emlp", type=int, help="Number of epochs emlp", default=10)
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint_ae", type=Path, default=None, help="Load autoencoder checkpoint.")
-    parser.add_argument("--checkpoint_mlp", type=Path, default=None, help="Load mlp checkpoint.")
+    parser.add_argument("--checkpoint_emlp", type=Path, default=None, help="Load emlp checkpoint.")
     return parser
 
 
@@ -27,68 +27,67 @@ def main(kwargs: Namespace) -> float:
     unsupervised_load = get_unsupervised_train(kwargs.bs, 8)
     train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs)
     ae_model = AutoEncoder().cuda()
-    mlp_model = MLP().cuda()
-    if kwargs.checkpoint_ae and kwargs.checkpoint_mlp:
+    emlp_model = EncoderMLP().cuda()
+    if kwargs.checkpoint_ae and kwargs.checkpoint_emlp:
         print("loading checkpoint...")
         state_dict_ae = torch.load(kwargs.checkpoint_ae, map_location="cuda", weights_only=True)
         ae_model.load_state_dict(state_dict_ae)
-        state_dict_mlp = torch.load(kwargs.checkpoint_mlp, map_location="cuda", weights_only=True)
-        mlp_model.load_state_dict(state_dict_mlp)
+        state_dict_emlp = torch.load(kwargs.checkpoint_emlp, map_location="cuda", weights_only=True)
+        emlp_model.load_state_dict(state_dict_emlp)
 
     ctx = Namespace(
         num_epochs_ae=kwargs.epochs_ae,
-        num_epochs_mlp=kwargs.epochs_mlp,
+        num_epochs_emlp=kwargs.epochs_emlp,
         verbose=kwargs.verbose,
         optimizer_ae=torch.optim.Adam(ae_model.parameters(), kwargs.lr_ae),
-        optimizer_mlp=torch.optim.Adam(mlp_model.parameters(), kwargs.lr_mlp),
+        optimizer_emlp=torch.optim.Adam(emlp_model.parameters(), kwargs.lr_emlp),
         criterion_ae=nn.MSELoss(),
-        criterion_mlp=nn.CrossEntropyLoss(),
+        criterion_emlp=nn.CrossEntropyLoss(),
         unsupervised_loader=unsupervised_load,
         train_loader=train_load, test_loader=test_load, val_loader=val_load,
-        train_losses_ae=[], train_losses_mlp=[]
+        train_losses_ae=[], train_losses_emlp=[]
     )
 
     # Train the AE
-    best_ae_model, best_ae_loss = None, float('inf')
+    best_encoder_model, best_ae_loss = None, float('inf')
     for epoch in range(kwargs.epochs_ae):
         loss = train_ae(epoch, ae_model, ctx)
 
-        # save best model
+        # save best encoder model
         if loss < best_ae_loss:
-            best_ae_model = ae_model.state_dict().copy()
+            best_encoder_model = ae_model.encoder.state_dict().copy()
             best_ae_loss = loss
+    
+    # Load the trained encoder into the Encoderemlp architecture
+    emlp_model.load_encoder_from_state_dict(best_encoder_model)
 
-    # Train the MLP
-    best_mlp_model, best_mlp_loss = None, float('inf')
-    for epoch in range(kwargs.epochs_mlp):
-        train_mlp(epoch, ae_model, mlp_model, ctx)
-        loss = test(epoch, ae_model, mlp_model, ctx)
+    # Train the Encoderemlp
+    best_emlp_model, best_emlp_loss = None, float('inf')
+    for epoch in range(kwargs.epochs_emlp):
+        train_emlp(epoch, emlp_model, ctx)
+        loss = test(epoch, emlp_model, ctx)
 
         # save best model
-        if loss < best_mlp_loss:
-            best_mlp_model = mlp_model.state_dict().copy()
-            best_mlp_loss = loss
+        if loss < best_emlp_loss:
+            best_emlp_model = emlp_model.state_dict().copy()
+            best_emlp_loss = loss
 
     # only perform test if no epochs
-    if kwargs.epochs_mlp > 0:
+    if kwargs.epochs_emlp > 0:
         id_ = uuid.uuid4().fields[0]
         (workspace := Path("training")).mkdir(exist_ok=True)
         print(f"Saving training data to '{workspace}' folder with id {id_}...")
 
         # save loss
         pd.Series(ctx.train_losses_ae).to_csv(workspace / f"train_loss_ae-{id_}.csv")
-        pd.Series(ctx.train_losses_mlp).to_csv(workspace / f"train_loss_mlp-{id_}.csv")
+        pd.Series(ctx.train_losses_emlp).to_csv(workspace / f"train_loss_emlp-{id_}.csv")
         # save model
-        if best_ae_model is not None:
-            torch.save(best_ae_model, workspace / f"autoencoder-{id_}.pt")
+        if best_emlp_model is not None:
+            torch.save(best_emlp_model, workspace / f"encoder_emlp-{id_}.pt")
             print("load best model...")
-            ae_model.load_state_dict(best_ae_model)
-        if best_mlp_model is not None:
-            torch.save(best_mlp_model, workspace / f"mlp-{id_}.pt")
-            print("load best model...")
-            mlp_model.load_state_dict(best_mlp_model)
+            emlp_model.load_state_dict(best_emlp_model)
 
-    return test(1, ae_model, mlp_model, ctx, val=False)  # FIXME: #1 error while doing test
+    return test(1, emlp_model, ctx, val=False)  # FIXME: #1 error while doing test
 
 
 def train_ae(epoch: int, ae_model: nn.Module, ctx: Namespace) -> None:
@@ -113,22 +112,15 @@ def train_ae(epoch: int, ae_model: nn.Module, ctx: Namespace) -> None:
         elif i%5 == 0:
             print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Iter [{i+1}/] Train loss : {loss.item():.3f}")
     return sum(losses)/len(losses)
-
-def train_mlp(epoch: int, ae_model: nn.Module, mlp_model: nn.Module, ctx: Namespace) -> None:
-    """Training loop for the MLP part."""
-    ae_model.train()
-    mlp_model.train()
-
-    # Freeze AE model
-    for param in ae_model.parameters():
-        param.requires_grad = False
+def train_emlp(epoch: int, emlp_model: nn.Module, ctx: Namespace) -> None:
+    """Training loop for the Encoderemlp part."""
+    emlp_model.train()
 
     total = wrong = 0
-    pbar = tqdm(ctx.train_loader, disable=not ctx.verbose, desc="Train MLP")
+    pbar = tqdm(ctx.train_loader, disable=not ctx.verbose, desc="Train Encoderemlp")
     for i, (images, labels) in enumerate(pbar):
         images, labels = images.cuda(), labels.cuda()
-        latent_reps = ae_model.encoder(images)
-        out = mlp_model(latent_reps)
+        out = emlp_model(images)
 
         predictions = torch.argmax(out, dim=1)
         incorrect_indices = (predictions.squeeze() != labels).nonzero().squeeze()
@@ -137,33 +129,32 @@ def train_mlp(epoch: int, ae_model: nn.Module, mlp_model: nn.Module, ctx: Namesp
         if len(incorrect_indices.shape) > 0:
             wrong += incorrect_indices.shape[0]
 
-        ctx.optimizer_mlp.zero_grad()
-        loss = ctx.criterion_mlp(out, labels)
+        ctx.optimizer_emlp.zero_grad()
+        loss = ctx.criterion_emlp(out, labels)
         loss.backward()
-        ctx.optimizer_mlp.step()
+        ctx.optimizer_emlp.step()
 
-        ctx.train_losses_mlp.append(loss.item())
+        ctx.train_losses_emlp.append(loss.item())
         if ctx.verbose:
             pbar.set_postfix_str(f"loss={loss.item():.4f}")
         elif i%5 == 0:
-            print(f"Epoch [{epoch+1}/{ctx.num_epochs_mlp}] Iter [{i+1}/] Train loss MLP : {loss.item():.3f}")
-    print(f"Train epoch [{epoch+1}/{ctx.num_epochs_mlp}] acc={100 - 100.*wrong/total:.2f}")
+            print(f"Epoch [{epoch+1}/{ctx.num_epochs_emlp}] Iter [{i+1}/] Train loss Encoderemlp : {loss.item():.3f}")
+    print(f"Train epoch [{epoch+1}/{ctx.num_epochs_emlp}] acc={100 - 100.*wrong/total:.2f}")
 
 
 @torch.no_grad()
-def test(epoch: int, ae_model: nn.Module, mlp_model: nn.Module, ctx: Namespace, val: bool=True) -> float:
+def test(epoch: int, emlp_model: nn.Module, ctx: Namespace, val: bool=True) -> float:
     """Evaluation loop."""
 
-    ae_model.eval()
-    mlp_model.eval()
+    emlp_model.eval()
 
     total = wrong = loss = 0
     loader = ctx.val_loader if val else ctx.test_loader
     val_ = "Val" if val else "Test"
     for images, labels in tqdm(loader, disable=not ctx.verbose, desc=val_):
         images, labels = images.cuda(), labels.cuda()
-        out = mlp_model(ae_model.encoder(images))
-        loss += ctx.criterion_mlp(out, labels).item() * images.shape[0]
+        out = emlp_model(images)
+        loss += ctx.criterion_emlp(out, labels).item() * images.shape[0]
 
         predictions = torch.argmax(out, dim=1)
         incorrect_indices = (predictions.squeeze() != labels).nonzero().squeeze()
@@ -173,7 +164,7 @@ def test(epoch: int, ae_model: nn.Module, mlp_model: nn.Module, ctx: Namespace, 
             wrong += incorrect_indices.shape[0]
     loss /= total
     acc = 100 - 100.*wrong/total
-    print(val_, f"epoch [{epoch+1}/{ctx.num_epochs_mlp}], acc={acc:.2f}, {loss=:.4f}")
+    print(val_, f"epoch [{epoch+1}/{ctx.num_epochs_emlp}], acc={acc:.2f}, {loss=:.4f}")
     return loss
 
 

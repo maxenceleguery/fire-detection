@@ -109,21 +109,22 @@ class AutoEncoder(nn.Module):
         return self.decoder(self.encoder(x))
 
 
-class MLP(nn.Module):
-    """A class to represent a simple MLP"""
+class EncoderMLP(nn.Module):
+    """A class to represent an encoder followed by a MLP"""
     def __init__(self):
         super().__init__()
+        self.encoder = Encoder()
         self.mlp = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_features=61952, out_features=2048),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(in_features=2048, out_features=256),
+            nn.Linear(in_features=61952, out_features=256),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(in_features=256, out_features=2),
             nn.Sigmoid()
         )
     def forward(self, x):
-        return self.mlp(x)
+        return self.mlp(self.encoder(x))
+    
+    def load_encoder_from_state_dict(self, state_dict):
+        self.encoder.load_state_dict(state_dict)
     
