@@ -1,5 +1,8 @@
+import torch
 from torch import nn
 from torchvision.models.resnet import resnet50, ResNet50_Weights
+
+from typing import Literal
 
 class CNN(nn.Module):
     def __init__(self):
@@ -23,7 +26,7 @@ class CNN(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(in_features=256, out_features=2),
-            nn.Sigmoid()
+            nn.Softmax(dim=-1)
         )
         
     def forward(self, x):
@@ -37,7 +40,7 @@ class Resnet50(nn.Module):
 
         self.base.fc = nn.Sequential(
             nn.Linear(in_features=self.base.fc.in_features, out_features=2),
-            nn.Sigmoid()
+            nn.Softmax(dim=-1)
         )
     
     def forward(self, x):
@@ -127,4 +130,43 @@ class EncoderMLP(nn.Module):
     
     def load_encoder_from_state_dict(self, state_dict):
         self.encoder.load_state_dict(state_dict)
+
+
+class DeepEmsemble(nn.Module):
+    def __init__(self, model_class: nn.Module | list[nn.Module], model_kwargs: dict | list[dict], emsemble_size: int = None, reduction: Literal["mean", "sum", "vote"] = "mean"):
+        super().__init__()
+
+        self.emsemble_size = emsemble_size
+        self.reduction = reduction
+
+        if isinstance(model_class, list):
+            self.models = nn.ModuleList([model(**kwargs) for model, kwargs in zip(model_class, model_kwargs, strict=True)])
+
+        else:
+            assert isinstance(model_kwargs, dict)
+            assert emsemble_size is not None
+            self.models = nn.ModuleList([model_class(**model_kwargs) for _ in range(emsemble_size)])
+
+
+    def get_optimizers(self, lr: float | list[float]):
+        if isinstance(lr, float):
+            return [torch.optim.Adam(model.parameters(), lr) for model in self.models]
+        else:
+            return [torch.optim.Adam(model.parameters(), single_lr) for model, single_lr in zip(self.models, lr)]
+
+    def apply_reduction(self, x):
+        if self.reduction == "mean":
+            return x.mean(dim=0)
+        elif self.reduction == "sum":
+            return x.sum(dim=0)
+        elif self.reduction == "vote":
+            raise NotImplementedError()
+
+    def forward(self, x):
+        if self.training:
+            return [model(x) for model in self.models]
+        else:
+            return self.apply_reduction(
+                torch.stack([model(x) for model in self.models], dim=0)
+            )
     

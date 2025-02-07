@@ -5,6 +5,8 @@ To create a job on a node use this command:
 
 ```bash
 srun --pty --time=02:00:00 --partition=ENSTA-h100 --gpus=1 bash
+python3 classif.py --model resnet50 --resize 256 --bs 128
+python3 classif_DE.py --model resnet50 --resize 256 --bs 64
 ```
 
 To install the dataset in the `data` folder, run the script `python dataset.py`. You need a kaggle API key to download the dataset.

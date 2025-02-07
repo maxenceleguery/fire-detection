@@ -7,7 +7,7 @@ import torch.nn as nn
 import pandas as pd
 
 from dataset import get_dataloaders
-from models import CNN, Resnet50
+from models import CNN, Resnet50, DeepEmsemble
 
 
 def train_parser():
@@ -17,6 +17,7 @@ def train_parser():
     parser.add_argument("--epochs", type=int, help="Number of epochs", default=10)
     parser.add_argument("--resize", type=int, help="Resize", default=350)
     parser.add_argument("--model", type=str, default="CNN", choices=["CNN", "resnet50"], help="Model")
+    parser.add_argument("--DE_size", type=int, default=3, help="Size of the ensemble")
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
     return parser
@@ -25,9 +26,9 @@ def train_parser():
 def main(kwargs: Namespace) -> float:
     train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs, resize=kwargs.resize)
     if kwargs.model == "CNN":
-        model = CNN().cuda()
+        model = DeepEmsemble(CNN, {}, kwargs.DE_size).cuda()
     elif kwargs.model == "resnet50":
-        model = Resnet50().cuda()
+        model = DeepEmsemble(Resnet50, {}, kwargs.DE_size).cuda()
     if kwargs.checkpoint:
         print("loading checkpoint...")
         state_dict = torch.load(kwargs.checkpoint, map_location="cuda", weights_only=True)
@@ -36,7 +37,7 @@ def main(kwargs: Namespace) -> float:
     ctx = Namespace(
         num_epochs=kwargs.epochs,
         verbose=kwargs.verbose,
-        optimizer=torch.optim.Adam(model.parameters(), kwargs.lr),
+        optimizers=model.get_optimizers(kwargs.lr),
         criterion=nn.CrossEntropyLoss(),
         train_loader=train_load, test_loader=test_load, val_loader=val_load,
         train_losses=[],
@@ -77,25 +78,28 @@ def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
     pbar = tqdm(ctx.train_loader, disable=not ctx.verbose, desc="Train")
     for i, (images, labels) in enumerate(pbar):
         images, labels = images.cuda(), labels.cuda()
-        out = model(images)
+        outs = model(images)
 
-        predictions = torch.argmax(out, dim=1)
+        predictions = torch.argmax(model.apply_reduction(torch.stack(outs, dim=0)), dim=1)
         incorrect_indices = (predictions.squeeze() != labels).nonzero().squeeze()
 
         total += predictions.shape[0]
         if len(incorrect_indices.shape) > 0:
             wrong += incorrect_indices.shape[0]
 
-        ctx.optimizer.zero_grad()
-        loss = ctx.criterion(out, labels)
-        loss.backward()
-        ctx.optimizer.step()
+        final_loss = 0
+        for optimizer, out in zip(ctx.optimizers, outs):
+            optimizer.zero_grad()
+            loss = ctx.criterion(out, labels)
+            loss.backward()
+            optimizer.step()
+            final_loss += loss
 
-        ctx.train_losses.append(loss.item())
+        ctx.train_losses.append(final_loss.item()/model.emsemble_size)
         if ctx.verbose:
-            pbar.set_postfix_str(f"loss={loss.item():.4f}")
+            pbar.set_postfix_str(f"loss={final_loss.item():.4f}")
         elif i%5 == 0:
-            print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Iter [{i+1}/] Train loss : {loss.item():.3f}")
+            print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Iter [{i+1}/] Train loss : {final_loss.item():.3f}")
     print(f"Train epoch [{epoch+1}/{ctx.num_epochs}] acc={100 - 100.*wrong/total:.2f}")
 
 
