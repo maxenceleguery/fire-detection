@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import pandas as pd
 
-from dataset import get_dataloaders
+from dataset import get_dataloaders, get_unsupervised_train
 from models import CNN, Resnet50, DeepEmsemble
 
 
@@ -20,11 +20,17 @@ def train_parser():
     parser.add_argument("--DE_size", type=int, default=3, help="Size of the ensemble")
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
+    parser.add_argument("--train_fixmatch", action="store_true", help="Train on pseudo labels")
     return parser
 
 
 def main(kwargs: Namespace) -> float:
     train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs, resize=kwargs.resize)
+    if kwargs.train_fixmatch:
+        train_load = get_unsupervised_train(batch_size=kwargs.bs, resize=kwargs.resize)
+        train_load.dataset.load_pseudo_labels()
+        train_load.dataset.toggle_pseudo_labels()
+
     if kwargs.model == "CNN":
         model = DeepEmsemble(CNN, {}, kwargs.DE_size).cuda()
     elif kwargs.model == "resnet50":

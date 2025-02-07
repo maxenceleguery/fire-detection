@@ -5,6 +5,8 @@ from torch.utils.data.dataloader import DataLoader
 from torch.utils.data import random_split
 from torch import Generator
 from typing import List
+import pandas as pd
+import numpy as np
 
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -25,9 +27,31 @@ valid_path = "./data/valid"
 
 
 class TrainDataset(ImageFolder):
+    def __init__(self, root, transform = None, target_transform = None, is_valid_file = None, allow_empty = False):
+        super().__init__(root=root, transform=transform, target_transform=target_transform, is_valid_file=is_valid_file, allow_empty=allow_empty)
+
+        self.using_pseudo_labels = False
+        self.pseudo_labels = -1*np.ones(len(self), dtype=np.int8)
+
+    def set_pseudo_label(self, index, label):
+        self.pseudo_labels[index] = label
+
+    def toggle_pseudo_labels(self):
+        self.pseudo_labels = pd.read_csv("pseudo_labels.csv")["pseudo_labels"].to_numpy()
+
+    def save_pseudo_labels(self):
+        pd.Series(self.pseudo_labels, name="pseudo_labels").to_csv("pseudo_labels.csv")
+
+    def load_pseudo_labels(self):
+        self.using_pseudo_labels = not self.using_pseudo_labels
+
     def __getitem__(self, index: int):
-        sample, _ = super().__getitem__(index)
-        return sample, -1
+        if self.using_pseudo_labels:
+            sample, _ = super().__getitem__(index)
+            return sample, self.pseudo_labels[index]
+        else:
+            sample, _ = super().__getitem__(index)
+            return sample, -1, index
 
 
 # Create an ImageFolder dataset
