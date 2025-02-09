@@ -56,9 +56,9 @@ class TrainDataset(ImageFolder):
 
 # Create an ImageFolder dataset
 def make_datasets(paths: List[str], resize: int=350):
-    t = T.Compose([ T.Resize(resize), T.ToTensor() ])
+    test_transform = T.Compose([ T.Resize(resize), T.ToTensor()])
     return [
-        (TrainDataset if "train" in path else ImageFolder)(root=path, transform=t) 
+        (TrainDataset if "train" in path else ImageFolder)(root=path, transform=test_transform) 
         for path in paths
     ]
 
@@ -68,6 +68,8 @@ def get_dataloaders(batch_size: int=256, split: float=0.7, num_workers: int=4, r
 
     test_dataset, valid_dataset = make_datasets([test_path, valid_path], resize)
     new_train_dataset, new_valid_dataset = random_split(valid_dataset, (split, (1-split)), Generator().manual_seed(seed))
+
+    new_train_dataset.transforms = T.Compose([ T.Resize(resize), T.ToTensor(), T.RandomHorizontalFlip(), T.RandomVerticalFlip() ])
 
     train_load = DataLoader(new_train_dataset, batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
     test_load = DataLoader(test_dataset, batch_size, num_workers=num_workers, pin_memory=True)
@@ -80,6 +82,7 @@ def get_unsupervised_train(batch_size: int=256, num_workers: int=4, resize: int=
     """Get the training dataset while removing the labels."""
     
     train_dataset = make_datasets([train_path], resize)[0]
+    train_dataset.transforms = T.Compose([ T.Resize(resize), T.ToTensor(), T.RandomHorizontalFlip(), T.RandomVerticalFlip() ])
     assert type(train_dataset) is TrainDataset, "The training dataset should not use any labels."
     return DataLoader(train_dataset, batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
 
