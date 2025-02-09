@@ -8,6 +8,7 @@ import pandas as pd
 
 from dataset import get_dataloaders, get_unsupervised_train
 from models import CNN, Resnet50, DeepEmsemble
+from simmim.vit import ViT
 
 
 def train_parser():
@@ -16,7 +17,7 @@ def train_parser():
     parser.add_argument("--bs", type=int, help="batch size", default=128)
     parser.add_argument("--epochs", type=int, help="Number of epochs", default=10)
     parser.add_argument("--resize", type=int, help="Resize", default=350)
-    parser.add_argument("--model", type=str, default="CNN", choices=["CNN", "resnet50"], help="Model")
+    parser.add_argument("--model", type=str, default="CNN", choices=["CNN", "resnet50", "vit"], help="Model")
     parser.add_argument("--DE_size", type=int, default=3, help="Size of the ensemble")
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
@@ -35,6 +36,21 @@ def main(kwargs: Namespace) -> float:
         model = DeepEmsemble(CNN, {}, kwargs.DE_size).cuda()
     elif kwargs.model == "resnet50":
         model = DeepEmsemble(Resnet50, {}, kwargs.DE_size).cuda()
+    elif kwargs.model == "vit":
+        model = DeepEmsemble(
+            ViT,
+            {
+                "image_size": 256,
+                "patch_size": 16,
+                "num_classes": 2,
+                "dim": 256,
+                "depth": 18,
+                "heads": 12,
+                "mlp_dim": 512,
+            },
+            kwargs.DE_size
+        ).cuda()
+        
     if kwargs.checkpoint:
         print("loading checkpoint...")
         state_dict = torch.load(kwargs.checkpoint, map_location="cuda", weights_only=True)
