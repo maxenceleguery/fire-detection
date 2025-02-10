@@ -95,17 +95,25 @@ def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
         out = model(images)
 
         if isinstance(model, DeepEmsemble):
-            predictions = model.apply_reduction(out).argmax(dim=1)
-            out = out.mean(0)
+            loss = 0
+            for optim, o in zip(ctx.optimizer, out):
+                optim.zero_grad()
+                loss_ = ctx.criterion(o, labels)
+                loss_.backward()
+                optim.step()
+                loss += loss_
+            loss /= model.emsemble_size
+            predictions = model.apply_reduction(torch.stack(out, dim=0)).argmax(dim=1)
         else:
+            # default training step
             predictions = out.argmax(dim=1)
+
+            ctx.optimizer.zero_grad()
+            loss = ctx.criterion(out, labels)
+            loss.backward()
+            ctx.optimizer.step()
+
         corrects += (predictions == labels).sum().item()
-
-        ctx.optimizer.zero_grad()
-        loss = ctx.criterion(out, labels)
-        loss.backward()
-        ctx.optimizer.step()
-
         ctx.train_losses.append(loss.item())
         if ctx.verbose:
             pbar.set_postfix_str(f"loss={loss.item():.4f}")

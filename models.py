@@ -168,8 +168,8 @@ class DeepEmsemble(nn.Module):
 
     def get_optimizers(self, lr: float | list[float]):
         if isinstance(lr, float):
-            return torch.optim.Adam([{"params": model.parameters()} for model in self.models], lr)
-        return torch.optim.Adam([{"params": model.parameters(), "lr": lr_} for model, lr_ in zip(self.models, lr)])
+            return [torch.optim.Adam(model.parameters(), lr) for model in self.models]
+        return [torch.optim.Adam(model.parameters(), lr_) for model, lr_ in zip(self.models, lr)]
 
     def apply_reduction(self, x):
         if self.reduction == "mean":  return x.mean(dim=0)
@@ -177,5 +177,7 @@ class DeepEmsemble(nn.Module):
         elif self.reduction == "vote":  raise NotImplementedError()
 
     def forward(self, x):
-        outs = torch.stack([model(x) for model in self.models], dim=0)
-        return outs if self.training else self.apply_reduction(outs)
+        outs = [model(x) for model in self.models]
+        if self.training:
+            return outs
+        return self.apply_reduction(torch.stack(outs, dim=0))
