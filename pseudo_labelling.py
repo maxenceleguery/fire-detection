@@ -1,16 +1,17 @@
-import uuid
 from argparse import Namespace, ArgumentParser
 from pathlib import Path
 from tqdm import tqdm
+import numpy as np
 import torch
-import torch.nn as nn
-import pandas as pd
+from torchvision.datasets import ImageFolder
 
 from dataset import get_unsupervised_train
 from models import CNN, Resnet50, DeepEmsemble
 
+
 def train_parser():
     parser = ArgumentParser()
+    parser.add_argument("--th", type=float, default=.5, help="Threshold for selecting pseudolabel")
     parser.add_argument("--bs", type=int, help="batch size", default=128)
     parser.add_argument("--resize", type=int, help="Resize", default=350)
     parser.add_argument("--model", type=str, default="CNN", choices=["CNN", "resnet50"], help="Model")
@@ -18,8 +19,10 @@ def train_parser():
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
     return parser
 
+
 def main(kwargs: Namespace):
     trainloader = get_unsupervised_train(batch_size=kwargs.bs, resize=kwargs.resize)
+    labels = np.array(ImageFolder(root="./data/train").targets, dtype=np.int8)
 
     if kwargs.DE_size > 1:
         if kwargs.model == "CNN":
@@ -45,11 +48,14 @@ def main(kwargs: Namespace):
             images = images.cuda()
             out = model(images)
 
-            predictions = torch.argmax(out, dim=1)
-            for index, label in zip(indexes, predictions):
-                trainloader.dataset.set_pseudo_label(index, label)
+            for index, conf, label in zip(indexes, *torch.max(out, dim=1)):
+                if conf > kwargs.th:
+                    trainloader.dataset.set_pseudo_label(index, label)
 
     trainloader.dataset.save_pseudo_labels()
+    pseudo_labels = trainloader.dataset.pseudo_labels
+    corrects = labels[pseudo_labels > -1] == pseudo_labels[pseudo_labels > -1]
+    print(f"Pseudo labelling accuracy: {corrects.mean() * 100:.2f}% over {len(corrects)}/{len(labels)} samples")
 
 if __name__ == "__main__":
     kwargs = train_parser().parse_args()
