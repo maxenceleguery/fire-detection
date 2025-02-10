@@ -77,8 +77,9 @@ def main(kwargs: Namespace) -> float:
             torch.save(best_model, workspace / f"classifier-{id_}.pt")
             print("load best model...")
             model.load_state_dict(best_model)
-    
-    return test(1, model, ctx, val=False)  # FIXME: #1 error while doing test
+
+    ctx.epochs=1
+    return test(1, model, ctx, val=False)
 
 
 def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
