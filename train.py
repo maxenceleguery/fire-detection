@@ -41,11 +41,16 @@ def main(kwargs: Namespace) -> float:
         print("loading checkpoint...")
         state_dict = torch.load(kwargs.checkpoint, map_location="cuda", weights_only=True)
         model.load_state_dict(state_dict)
-    
+
+    if isinstance(model, DeepEmsemble):
+        optim = model.get_optimizers(kwargs.lr)
+    else:
+        optim = torch.optim.Adam(model.parameters(), kwargs.lr)
+
     ctx = Namespace(
         num_epochs=kwargs.epochs,
         verbose=kwargs.verbose,
-        optimizer=torch.optim.Adam(model.parameters(), kwargs.lr),
+        optimizer=optim,
         criterion=nn.CrossEntropyLoss(),
         train_loader=train_load, test_loader=test_load, val_loader=val_load,
         train_losses=[],
