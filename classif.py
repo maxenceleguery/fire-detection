@@ -72,18 +72,14 @@ def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
     """Training loop."""
 
     model.train()
-    total = wrong = 0
+    corrects = 0
     pbar = tqdm(ctx.train_loader, disable=not ctx.verbose, desc="Train")
     for i, (images, labels) in enumerate(pbar):
         images, labels = images.cuda(), labels.cuda()
         out = model(images)
 
         predictions = torch.argmax(out, dim=1)
-        incorrect_indices = (predictions.squeeze() != labels).nonzero().squeeze()
-
-        total += predictions.shape[0]
-        if len(incorrect_indices.shape) > 0:
-            wrong += incorrect_indices.shape[0]
+        corrects += (predictions == labels).sum().item()
 
         ctx.optimizer.zero_grad()
         loss = ctx.criterion(out, labels)
@@ -95,7 +91,8 @@ def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
             pbar.set_postfix_str(f"loss={loss.item():.4f}")
         elif i%5 == 0:
             print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Iter [{i+1}/] Train loss : {loss.item():.3f}")
-    print(f"Train epoch [{epoch+1}/{ctx.num_epochs}] acc={100 - 100.*wrong/total:.2f}")
+    acc = corrects / len(ctx.train_loader.dataset)
+    print(f"Train epoch [{epoch+1}/{ctx.num_epochs}] acc={acc * 100:.2f}")
 
 
 @torch.no_grad()
@@ -103,7 +100,7 @@ def test(epoch: int, model: nn.Module, ctx: Namespace, val: bool=True) -> float:
     """Evaluation loop."""
 
     model.eval()
-    total = wrong = loss = 0
+    corrects = loss = 0
     loader = ctx.val_loader if val else ctx.test_loader
     val_ = "Val" if val else "Test"
     for images, labels in tqdm(loader, disable=not ctx.verbose, desc=val_):
@@ -112,13 +109,11 @@ def test(epoch: int, model: nn.Module, ctx: Namespace, val: bool=True) -> float:
         loss += ctx.criterion(out, labels).item() * images.shape[0]
 
         predictions = torch.argmax(out, dim=1)
-        incorrect_indices = (predictions.squeeze() != labels).nonzero().squeeze()
+        corrects += (predictions == labels).sum().item()
 
-        total += predictions.shape[0]
-        if len(incorrect_indices.shape) > 0:
-            wrong += incorrect_indices.shape[0]
+    total = len(loader.dataset)
     loss /= total
-    acc = 100 - 100.*wrong/total
+    acc = 100 * corrects / total
     print(val_, f"epoch [{epoch+1}/{ctx.num_epochs}], acc={acc:.2f}, {loss=:.4f}")
     return loss
 
