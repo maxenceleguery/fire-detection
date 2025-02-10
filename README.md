@@ -22,4 +22,12 @@ The script `train.py` trains a CNN classifier as default using the labels of the
 - This script also supports deep ensemble models that are load with a `-DE` adding to the model's name and `--DE_size` specifying the ensemble size (defaults to 3).
 - The scripts also support training using fixmatch with the `--fixmatch` option. The training dataset is replaced by the pseudolabelised one.
 
-The script `ae_mlp.py` trains first an Auto Encoder using the training set (without the labels), and then trains a MLP on the labels of the validation dataset using the latent representation from the trained encoder. To load a model to be trained, use the `--checkpoint_ae` and `--checkpoint_mlp` argument to provide the path to the models (AE and MLP) weights. To only test a model, one can use the argument `--epochs 0`. 
+The script `ae_mlp.py` trains first an Auto Encoder using the training set (without the labels), and then trains a MLP on the labels of the validation dataset using the latent representation from the trained encoder. To load a model to be trained, use the `--checkpoint_ae` and `--checkpoint_mlp` argument to provide the path to the models (AE and MLP) weights. To only test a model, one can use the argument `--epochs 0`.
+
+## Trainings
+
+A training using fixmatch can be performed this way:
+- train a model using `train.py -m [model] ...`
+- perform pseudo_labelling with it using `pseudo_labelling.py -m [model] --checkpoint [previous checkpoint] ...`
+- train the first model or a new model with fixmatch using `train.py -m [model] --checkpoint [] --fixmatch ...`
+Note: I (clément) can't get good results using fixmatch on the default CNN as doing it decrease the performances (I do it on 2 epochs). The pseudolabels have over 90% of correctness if I look at the training labels (I used a threhold of 0.99 to create them).

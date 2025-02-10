@@ -80,8 +80,8 @@ def main(kwargs: Namespace) -> float:
             print("load best model...")
             model.load_state_dict(best_model)
 
-    ctx.epochs=1
-    return test(1, model, ctx, val=False)
+    ctx.num_epochs=1
+    return test(0, model, ctx, val=False)
 
 
 def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
