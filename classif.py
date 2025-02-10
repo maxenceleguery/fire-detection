@@ -6,8 +6,9 @@ import torch
 import torch.nn as nn
 import pandas as pd
 
-from dataset import get_dataloaders
-from models import load_model
+from dataset import get_dataloaders, get_unsupervised_train
+from models import load_model, MODELS, DeepEmsemble
+import fixmatch
 
 
 def train_parser():
@@ -16,15 +17,24 @@ def train_parser():
     parser.add_argument("--bs", type=int, help="batch size", default=128)
     parser.add_argument("--epochs", type=int, help="Number of epochs", default=10)
     parser.add_argument("--resize", type=int, help="Resize", default=350)
-    parser.add_argument("--model", type=str, default="CNN", choices=["CNN", "resnet50", "vit"], help="Model")
+    parser.add_argument("-m", "--model", type=str, default="CNN", choices=MODELS, help="Model")
+    parser.add_argument("--DE_size", type=int, default=3, help="Size of the ensemble when a DE model is selected")
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
+    parser.add_argument("--fixmatch", action="store_true", help="Train on pseudo labels")
     return parser
 
 
 def main(kwargs: Namespace) -> float:
     train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs, resize=kwargs.resize)
-    model = load_model(kwargs.model)
+
+    if kwargs.fixmatch:
+        train_load = get_unsupervised_train(batch_size=kwargs.bs, resize=kwargs.resize)
+        train_load.dataset.load_pseudo_labels()
+        train_load.dataset.toggle_pseudo_labels()
+        train_load.dataset.transforms = fixmatch.get_transform(kwargs.resize)
+    
+    model = load_model(kwargs.model, DE_size=kwargs.DE_size)
 
     if kwargs.checkpoint:
         print("loading checkpoint...")
@@ -78,7 +88,11 @@ def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
         images, labels = images.cuda(), labels.cuda()
         out = model(images)
 
-        predictions = torch.argmax(out, dim=1)
+        if isinstance(model, DeepEmsemble):
+            predictions = model.apply_reduction(out).argmax(dim=1)
+            out = out.mean(0)
+        else:
+            predictions = out.argmax(dim=1)
         corrects += (predictions == labels).sum().item()
 
         ctx.optimizer.zero_grad()

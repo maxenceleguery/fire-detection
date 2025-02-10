@@ -4,6 +4,7 @@ from torchvision.models.resnet import resnet50, ResNet50_Weights
 
 from typing import Literal
 
+MODELS = ["CNN", "vit", "resnet50", "CNN-DE", "resnet50-DE", "vit-DE"]
 VIT_CONFIG = dict( image_size=256, num_classes=2, patch_size=16, dim=256, depth=18, heads=12, mlp_dim=512 )
 
 def load_model(name: str, **kwargs):
@@ -16,6 +17,7 @@ def load_model(name: str, **kwargs):
         case "CNN-DE":  model = DeepEmsemble(CNN, {}, kwargs["DE_size"])
         case "resnet50-DE":  model = DeepEmsemble(Resnet50, {}, kwargs["DE_size"])
         case "vit-DE":  model = DeepEmsemble(ViT, VIT_CONFIG, kwargs["DE_size"])
+        case _:  raise ValueError(f"Unknown model {name}")
     return model.cuda()
             
 
@@ -166,23 +168,14 @@ class DeepEmsemble(nn.Module):
 
     def get_optimizers(self, lr: float | list[float]):
         if isinstance(lr, float):
-            return [torch.optim.Adam(model.parameters(), lr) for model in self.models]
-        else:
-            return [torch.optim.Adam(model.parameters(), single_lr) for model, single_lr in zip(self.models, lr)]
+            return torch.optim.Adam([model.parameters() for model in self.models], lr)
+        return torch.optim.Adam([{"params": model.parameters(), "lr": lr_} for model, lr_ in zip(self.models, lr)])
 
     def apply_reduction(self, x):
-        if self.reduction == "mean":
-            return x.mean(dim=0)
-        elif self.reduction == "sum":
-            return x.sum(dim=0)
-        elif self.reduction == "vote":
-            raise NotImplementedError()
+        if self.reduction == "mean":  return x.mean(dim=0)
+        elif self.reduction == "sum":  return x.sum(dim=0)
+        elif self.reduction == "vote":  raise NotImplementedError()
 
     def forward(self, x):
-        if self.training:
-            return [model(x) for model in self.models]
-        else:
-            return self.apply_reduction(
-                torch.stack([model(x) for model in self.models], dim=0)
-            )
-    
+        outs = torch.stack([model(x) for model in self.models], dim=0)
+        return outs if self.training else self.apply_reduction(outs)
