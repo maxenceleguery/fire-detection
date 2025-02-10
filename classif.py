@@ -7,8 +7,7 @@ import torch.nn as nn
 import pandas as pd
 
 from dataset import get_dataloaders
-from models import CNN, Resnet50
-from simmim.vit import ViT
+from models import load_model
 
 
 def train_parser():
@@ -25,21 +24,8 @@ def train_parser():
 
 def main(kwargs: Namespace) -> float:
     train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs, resize=kwargs.resize)
-    if kwargs.model == "CNN":
-        model = CNN().cuda()
-    elif kwargs.model == "resnet50":
-        model = Resnet50().cuda()
-    elif kwargs.model == "vit":
-        model = ViT(
-        image_size=256,
-        patch_size=16,
-        num_classes=2,
-        dim=256,
-        depth=18,
-        heads=12,
-        mlp_dim=512,
-    ).cuda()
-        
+    model = load_model(kwargs.model)
+
     if kwargs.checkpoint:
         print("loading checkpoint...")
         state_dict = torch.load(kwargs.checkpoint, map_location="cuda", weights_only=True)

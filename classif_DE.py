@@ -7,8 +7,7 @@ import torch.nn as nn
 import pandas as pd
 
 from dataset import get_dataloaders, get_unsupervised_train
-from models import CNN, Resnet50, DeepEmsemble
-from simmim.vit import ViT
+from models import load_model
 
 
 def train_parser():
@@ -32,25 +31,8 @@ def main(kwargs: Namespace) -> float:
         train_load.dataset.load_pseudo_labels()
         train_load.dataset.toggle_pseudo_labels()
 
-    if kwargs.model == "CNN":
-        model = DeepEmsemble(CNN, {}, kwargs.DE_size).cuda()
-    elif kwargs.model == "resnet50":
-        model = DeepEmsemble(Resnet50, {}, kwargs.DE_size).cuda()
-    elif kwargs.model == "vit":
-        model = DeepEmsemble(
-            ViT,
-            {
-                "image_size": 256,
-                "patch_size": 16,
-                "num_classes": 2,
-                "dim": 256,
-                "depth": 18,
-                "heads": 12,
-                "mlp_dim": 512,
-            },
-            kwargs.DE_size
-        ).cuda()
-        
+    model = load_model(f"{kwargs.model}-DE", DE_size=kwargs.DE_size)
+
     if kwargs.checkpoint:
         print("loading checkpoint...")
         state_dict = torch.load(kwargs.checkpoint, map_location="cuda", weights_only=True)

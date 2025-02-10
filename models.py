@@ -4,6 +4,22 @@ from torchvision.models.resnet import resnet50, ResNet50_Weights
 
 from typing import Literal
 
+VIT_CONFIG = dict( image_size=256, num_classes=2, patch_size=16, dim=256, depth=18, heads=12, mlp_dim=512 )
+
+def load_model(name: str, **kwargs):
+    match name:
+        case "CNN":  model = CNN()
+        case "resnet50":  model = Resnet50()
+        case "vit":  
+            from simmim.vit import ViT
+            model = ViT(**VIT_CONFIG)
+        case "CNN-DE":  model = DeepEmsemble(CNN, {}, kwargs["DE_size"])
+        case "resnet50-DE":  model = DeepEmsemble(Resnet50, {}, kwargs["DE_size"])
+        case "vit-DE":  model = DeepEmsemble(ViT, VIT_CONFIG, kwargs["DE_size"])
+    return model.cuda()
+            
+
+
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
