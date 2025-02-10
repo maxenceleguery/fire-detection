@@ -168,7 +168,7 @@ class DeepEmsemble(nn.Module):
 
     def get_optimizers(self, lr: float | list[float]):
         if isinstance(lr, float):
-            return torch.optim.Adam([model.parameters() for model in self.models], lr)
+            return torch.optim.Adam([{"params": model.parameters()} for model in self.models], lr)
         return torch.optim.Adam([{"params": model.parameters(), "lr": lr_} for model, lr_ in zip(self.models, lr)])
 
     def apply_reduction(self, x):
