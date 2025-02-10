@@ -17,6 +17,9 @@ To install the dataset in the `data` folder, run the script `python dataset.py`.
 The loading of the data is performed in the `dataset.py` file.
 The different models used are stored in `models.py`. 
 
-The script `classif.py` trains a classifier using the labels of the validation dataset. To load a model to be trained, use the `--checkpoint` argument to provide the path to the model weights. To only test a model, one can use the argument `--epochs 0`. 
+The script `train.py` trains a CNN classifier as default using the labels of the validation dataset.
+- To load a model to be trained, use the `--checkpoint` argument to provide the path to the model weights. To only test a model, one can use the argument `--epochs 0`.
+- This script also supports deep ensemble models that are load with a `-DE` adding to the model's name and `--DE_size` specifying the ensemble size (defaults to 3).
+- The scripts also support training using fixmatch with the `--fixmatch` option. The training dataset is replaced by the pseudolabelised one.
 
 The script `ae_mlp.py` trains first an Auto Encoder using the training set (without the labels), and then trains a MLP on the labels of the validation dataset using the latent representation from the trained encoder. To load a model to be trained, use the `--checkpoint_ae` and `--checkpoint_mlp` argument to provide the path to the models (AE and MLP) weights. To only test a model, one can use the argument `--epochs 0`. 
