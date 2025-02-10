@@ -30,6 +30,7 @@ def main(kwargs: Namespace) -> float:
 
     if kwargs.fixmatch:
         train_load = get_unsupervised_train(batch_size=kwargs.bs, resize=kwargs.resize)
+        assert Path("pseudo_labels.csv").exists()
         train_load.dataset.load_pseudo_labels()
         train_load.dataset.toggle_pseudo_labels()
         train_load.dataset.transforms = fixmatch.get_transform(kwargs.resize)

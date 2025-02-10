@@ -37,7 +37,10 @@ class TrainDataset(ImageFolder):
         self.pseudo_labels[index] = label
 
     def toggle_pseudo_labels(self):
-        self.pseudo_labels = pd.read_csv("pseudo_labels.csv")["pseudo_labels"].to_numpy()
+        pseudo_labels = pd.read_csv("pseudo_labels.csv")["pseudo_labels"].to_numpy()
+        # handle unlabeled samples 
+        self.samples = [ d for i, d in enumerate(self.samples) if pseudo_labels[i] != -1 ]
+        self.pseudo_labels = pseudo_labels[pseudo_labels != -1]
 
     def save_pseudo_labels(self):
         pd.Series(self.pseudo_labels, name="pseudo_labels").to_csv("pseudo_labels.csv")
@@ -46,11 +49,10 @@ class TrainDataset(ImageFolder):
         self.using_pseudo_labels = not self.using_pseudo_labels
 
     def __getitem__(self, index: int):
+        sample, _ = super().__getitem__(index)
         if self.using_pseudo_labels:
-            sample, _ = super().__getitem__(index)
             return sample, self.pseudo_labels[index]
         else:
-            sample, _ = super().__getitem__(index)
             return sample, -1, index
 
 
