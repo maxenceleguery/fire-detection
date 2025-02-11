@@ -8,6 +8,7 @@ srun --pty --time=02:00:00 --partition=ENSTA-h100 --gpus=1 bash
 python3 classif.py --model resnet50 --resize 256 --bs 128
 python3 classif_DE.py --model resnet50 --resize 256 --bs 64
 python3 pseudo_labelling.py --bs 64 --resize 256 --model resnet50 --DE_size 3 --checkpoint ./training/de-98.pt
+python3 ae_mlp.py --lr_ae 1e-3 --lr_emlp 1e-4 --bs 256 --epochs_emlp 20
 ```
 
 To install the dataset in the `data` folder, run the script `python dataset.py`. You need a kaggle API key to download the dataset.
