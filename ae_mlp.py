@@ -96,7 +96,7 @@ def train_ae(epoch: int, ae_model: nn.Module, ctx: Namespace) -> None:
     ae_model.train()
     pbar = tqdm(ctx.unsupervised_loader, disable=not ctx.verbose, desc="Train AE")
     losses = []
-    for i, (images, _) in enumerate(pbar):
+    for i, (images, _, _) in enumerate(pbar):
         images = images.cuda()
         images_rec = ae_model(images)
 
