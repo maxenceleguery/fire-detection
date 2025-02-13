@@ -5,6 +5,7 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import pandas as pd
+from copy import deepcopy
 
 from dataset import get_dataloaders, get_unsupervised_train
 from models import AutoEncoder, EncoderMLP
@@ -13,10 +14,10 @@ from models import AutoEncoder, EncoderMLP
 def train_parser():
     parser = ArgumentParser()
     parser.add_argument("--lr_ae", type=float, default=1e-3)
-    parser.add_argument("--lr_emlp", type=float, default=1e-3)
+    parser.add_argument("--lr_emlp", type=float, default=1e-4)
     parser.add_argument("--bs", type=int, help="batch size", default=256)
-    parser.add_argument("--epochs_ae", type=int, help="Number of epochs AE", default=10)
-    parser.add_argument("--epochs_emlp", type=int, help="Number of epochs emlp", default=10)
+    parser.add_argument("--epochs_ae", type=int, help="Number of epochs AE", default=5)
+    parser.add_argument("--epochs_emlp", type=int, help="Number of epochs emlp", default=20)
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint_ae", type=Path, default=None, help="Load autoencoder checkpoint.")
     parser.add_argument("--checkpoint_emlp", type=Path, default=None, help="Load emlp checkpoint.")
@@ -55,11 +56,12 @@ def main(kwargs: Namespace) -> float:
 
         # save best encoder model
         if loss < best_ae_loss:
-            best_encoder_model = ae_model.encoder.state_dict().copy()
+            best_encoder_model = deepcopy(ae_model.encoder.state_dict())
             best_ae_loss = loss
-    
+
     # Load the trained encoder into the Encoderemlp architecture
-    emlp_model.load_encoder_from_state_dict(best_encoder_model)
+    if best_encoder_model is not None:
+        emlp_model.load_encoder_from_state_dict(best_encoder_model)
 
     # Train the Encoderemlp
     best_emlp_model, best_emlp_loss = None, float('inf')
@@ -112,12 +114,13 @@ def train_ae(epoch: int, ae_model: nn.Module, ctx: Namespace) -> None:
         elif i%5 == 0:
             print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Iter [{i+1}/] Train loss : {loss.item():.3f}")
     return sum(losses)/len(losses)
+
 def train_emlp(epoch: int, emlp_model: nn.Module, ctx: Namespace) -> None:
     """Training loop for the Encoderemlp part."""
     emlp_model.train()
 
     total = wrong = 0
-    pbar = tqdm(ctx.train_loader, disable=not ctx.verbose, desc="Train Encoderemlp")
+    pbar = tqdm(ctx.train_loader, disable=not ctx.verbose, desc="Train EncoderMLP")
     for i, (images, labels) in enumerate(pbar):
         images, labels = images.cuda(), labels.cuda()
         out = emlp_model(images)
