@@ -21,6 +21,7 @@ def train_parser():
     parser.add_argument("--DE_size", type=int, default=3, help="Size of the ensemble when a DE model is selected")
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
+    parser.add_argument("--hugging", type=str, default=None, choices=["Maxenceleguery/de-3-resnet-50"], help="Load model from HuggingFace")
     parser.add_argument("--fixmatch", action="store_true", help="Train on pseudo labels")
     return parser
 
@@ -35,12 +36,16 @@ def main(kwargs: Namespace) -> float:
         train_load.dataset.toggle_pseudo_labels()
         train_load.dataset.transforms = fixmatch.get_transform(kwargs.resize)
     
-    model = load_model(kwargs.model, DE_size=kwargs.DE_size)
 
-    if kwargs.checkpoint:
-        print("loading checkpoint...")
-        state_dict = torch.load(kwargs.checkpoint, map_location="cuda", weights_only=True)
-        model.load_state_dict(state_dict)
+    model = load_model(kwargs.model, DE_size=kwargs.DE_size)
+    
+    if kwargs.hugging:
+        model.from_pretrained(kwargs.hugging)
+    else:
+        if kwargs.checkpoint:
+            print("loading checkpoint...")
+            state_dict = torch.load(kwargs.checkpoint, map_location="cuda", weights_only=True)
+            model.load_state_dict(state_dict)
 
     if isinstance(model, DeepEmsemble):
         optim = model.get_optimizers(kwargs.lr)

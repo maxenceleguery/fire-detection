@@ -1,4 +1,5 @@
 import torch
+from huggingface_hub import PyTorchModelHubMixin
 from torch import nn
 from torchvision.models.resnet import resnet50, ResNet50_Weights
 
@@ -22,7 +23,7 @@ def load_model(name: str, **kwargs):
             
 
 
-class CNN(nn.Module):
+class CNN(nn.Module, PyTorchModelHubMixin):
     def __init__(self):
         super(CNN, self).__init__()
         self.network = nn.Sequential(
@@ -50,7 +51,7 @@ class CNN(nn.Module):
     def forward(self, x):
         return self.network(x)
     
-class Resnet50(nn.Module):
+class Resnet50(nn.Module, PyTorchModelHubMixin):
     def __init__(self):
         super().__init__()
 
@@ -120,7 +121,7 @@ class Decoder(nn.Module):
     def forward(self, x):
         return self.decoder(x)
 
-class AutoEncoder(nn.Module):
+class AutoEncoder(nn.Module, PyTorchModelHubMixin):
     def __init__(self):
         super().__init__()
         self.encoder = Encoder()
@@ -130,7 +131,7 @@ class AutoEncoder(nn.Module):
         return self.decoder(self.encoder(x))
 
 
-class EncoderMLP(nn.Module):
+class EncoderMLP(nn.Module, PyTorchModelHubMixin):
     """A class to represent an encoder followed by a MLP"""
     def __init__(self):
         super().__init__()
@@ -150,7 +151,7 @@ class EncoderMLP(nn.Module):
         self.encoder.load_state_dict(state_dict)
 
 
-class DeepEmsemble(nn.Module):
+class DeepEmsemble(nn.Module, PyTorchModelHubMixin):
     def __init__(self, model_class: nn.Module | list[nn.Module], model_kwargs: dict | list[dict], emsemble_size: int = None, reduction: Literal["mean", "sum", "vote"] = "mean"):
         super().__init__()
 

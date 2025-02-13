@@ -17,13 +17,11 @@ def main():
         heads=12,
         mlp_dim=512,
     )
-    sample, _, index = next(iter(trainloader))
-    print(vit.cuda()(sample.cuda()).shape)
-
     sim = SimMIM(encoder=vit).cuda()
     optimizer = torch.optim.Adam(sim.parameters(), lr=0.01, weight_decay=5e-4)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.5)
 
-    for epoch in range(10):
+    for epoch in range(20):
         final_loss = 0
         pbar = tqdm(trainloader, desc="Train SimMIM")
         for batch_idx, (inputs, _, _) in enumerate(pbar):
@@ -33,9 +31,10 @@ def main():
             loss.backward()
             optimizer.step()
             final_loss += loss
-        pbar.set_postfix_str(f"loss={final_loss.item():.4f}")
+            pbar.set_postfix_str(f"loss={100*final_loss.item()/(batch_idx+1):.4f}")
+        scheduler.step()
 
-    torch.save(sim.encoder.state_dict(), "training/simmim-vit.pt")
+    torch.save(sim.encoder.state_dict(), "training/simmim-vit_v2.pt")
 
 
 if __name__ == "__main__":
