@@ -1,5 +1,6 @@
 from typing import Literal
 
+from huggingface_hub import PyTorchModelHubMixin
 import torch
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
@@ -92,7 +93,7 @@ class Transformer(nn.Module):
         return self.norm(x)
 
 
-class ViT(nn.Module):
+class ViT(nn.Module, PyTorchModelHubMixin):
     def __init__(
         self,
         *,

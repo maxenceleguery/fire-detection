@@ -32,3 +32,29 @@ A training using fixmatch can be performed this way:
 - perform pseudo_labelling with it using `pseudo_labelling.py -m [model] --checkpoint [previous checkpoint] ...`
 - train the first model or a new model with fixmatch using `train.py -m [model] --checkpoint [] --fixmatch ...`
 Note: I (clément) can't get good results using fixmatch on the default CNN as doing it decrease the performances (I do it on 2 epochs). The pseudolabels have over 90% of correctness if I look at the training labels (I used a threhold of 0.99 to create them).
+
+## Weights
+
+Available on HuggingFace :
+- Maxenceleguery/de-3-resnet-50
+- Maxenceleguery/cnn-ae-pretrained
+- Maxenceleguery/vit-simmim
+
+```python
+from models import load_model
+
+model = load_model("resnet50-DE", DE_size=3)
+model.from_pretrained("Maxenceleguery/de-3-resnet-50")
+```
+
+### Testing models
+
+```bash
+python3 train.py --epochs 0 --bs 128 --resize 256 -m resnet50-DE --DE_size 3 --hugging Maxenceleguery/de-3-resnet-50
+python3 train.py --epochs 0 --bs 128 --resize 350 -m EncoderMLP --hugging Maxenceleguery/cnn-ae-pretrained
+python3 train.py --epochs 0 --bs 128 --resize 256 -m vit --hugging Maxenceleguery/vit-simmim
+```
+
+- de-3-resnet-50 (fixmatch) 99.16 %
+- cnn-ae-pretrained 93.32 %
+- vit-simmim 91.86 %

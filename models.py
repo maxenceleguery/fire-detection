@@ -5,12 +5,13 @@ from torchvision.models.resnet import resnet50, ResNet50_Weights
 
 from typing import Literal
 
-MODELS = ["CNN", "vit", "resnet50", "CNN-DE", "resnet50-DE", "vit-DE"]
+MODELS = ["CNN", "EncoderMLP", "vit", "resnet50", "CNN-DE", "resnet50-DE", "vit-DE"]
 VIT_CONFIG = dict( image_size=256, num_classes=2, patch_size=16, dim=256, depth=18, heads=12, mlp_dim=512 )
 
 def load_model(name: str, **kwargs):
     match name:
         case "CNN":  model = CNN()
+        case "EncoderMLP": model = EncoderMLP()
         case "resnet50":  model = Resnet50()
         case "vit":  
             from simmim.vit import ViT
@@ -152,8 +153,11 @@ class EncoderMLP(nn.Module, PyTorchModelHubMixin):
 
 
 class DeepEmsemble(nn.Module, PyTorchModelHubMixin):
-    def __init__(self, model_class: nn.Module | list[nn.Module], model_kwargs: dict | list[dict], emsemble_size: int = None, reduction: Literal["mean", "sum", "vote"] = "mean"):
+    def __init__(self, model_class: nn.Module | list[nn.Module] = Resnet50, model_kwargs: dict | list[dict] = None, emsemble_size: int = None, reduction: Literal["mean", "sum", "vote"] = "mean"):
         super().__init__()
+
+        if model_kwargs is None:
+            model_kwargs = {}
 
         self.emsemble_size = emsemble_size
         self.reduction = reduction
@@ -169,8 +173,8 @@ class DeepEmsemble(nn.Module, PyTorchModelHubMixin):
 
     def get_optimizers(self, lr: float | list[float]):
         if isinstance(lr, float):
-            return [torch.optim.Adam(model.parameters(), lr) for model in self.models]
-        return [torch.optim.Adam(model.parameters(), lr_) for model, lr_ in zip(self.models, lr)]
+            return [torch.optim.Adam(model.parameters(), lr, weight_decay=5e-4) for model in self.models]
+        return [torch.optim.Adam(model.parameters(), lr_, weight_decay=5e-4) for model, lr_ in zip(self.models, lr)]
 
     def apply_reduction(self, x):
         if self.reduction == "mean":  return x.mean(dim=0)

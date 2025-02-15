@@ -21,7 +21,7 @@ def train_parser():
     parser.add_argument("--DE_size", type=int, default=3, help="Size of the ensemble when a DE model is selected")
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
-    parser.add_argument("--hugging", type=str, default=None, choices=["Maxenceleguery/de-3-resnet-50"], help="Load model from HuggingFace")
+    parser.add_argument("--hugging", type=str, default=None, choices=["Maxenceleguery/de-3-resnet-50", "Maxenceleguery/cnn-ae-pretrained", "Maxenceleguery/vit-simmim"], help="Load model from HuggingFace")
     parser.add_argument("--fixmatch", action="store_true", help="Train on pseudo labels")
     return parser
 
@@ -31,16 +31,16 @@ def main(kwargs: Namespace) -> float:
 
     if kwargs.fixmatch:
         train_load = get_unsupervised_train(batch_size=kwargs.bs, resize=kwargs.resize)
-        assert Path("pseudo_labels.csv").exists()
+        assert Path("pseudo_labels_2.csv").exists()
         train_load.dataset.load_pseudo_labels()
         train_load.dataset.toggle_pseudo_labels()
         train_load.dataset.transforms = fixmatch.get_transform(kwargs.resize)
     
 
     model = load_model(kwargs.model, DE_size=kwargs.DE_size)
-    
+
     if kwargs.hugging:
-        model.from_pretrained(kwargs.hugging)
+        model = model.from_pretrained(kwargs.hugging).cuda()
     else:
         if kwargs.checkpoint:
             print("loading checkpoint...")
@@ -49,13 +49,16 @@ def main(kwargs: Namespace) -> float:
 
     if isinstance(model, DeepEmsemble):
         optim = model.get_optimizers(kwargs.lr)
+        scheduler = None
     else:
-        optim = torch.optim.Adam(model.parameters(), kwargs.lr)
+        optim = torch.optim.Adam(model.parameters(), kwargs.lr, weight_decay=5e-4)
+        scheduler = torch.optim.lr_scheduler.StepLR(optim, step_size=5, gamma=0.5)
 
     ctx = Namespace(
         num_epochs=kwargs.epochs,
         verbose=kwargs.verbose,
         optimizer=optim,
+        scheduler=scheduler,
         criterion=nn.CrossEntropyLoss(),
         train_loader=train_load, test_loader=test_load, val_loader=val_load,
         train_losses=[],
@@ -124,6 +127,9 @@ def train(epoch: int, model: nn.Module, ctx: Namespace) -> None:
             pbar.set_postfix_str(f"loss={loss.item():.4f}")
         elif i%5 == 0:
             print(f"Epoch [{epoch+1}/{ctx.num_epochs}] Iter [{i+1}/] Train loss : {loss.item():.3f}")
+
+    if ctx.scheduler:
+        ctx.scheduler.step()
     acc = corrects / len(ctx.train_loader.dataset)
     print(f"Train epoch [{epoch+1}/{ctx.num_epochs}] acc={acc * 100:.2f}")
 
