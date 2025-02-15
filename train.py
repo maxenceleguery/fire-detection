@@ -8,6 +8,7 @@ import pandas as pd
 
 from dataset import get_dataloaders, get_unsupervised_train
 from models import load_model, MODELS, DeepEmsemble
+from metrics.scoring import Scoring
 import fixmatch
 
 
@@ -140,6 +141,9 @@ def test(epoch: int, model: nn.Module, ctx: Namespace, val: bool=True) -> float:
 
     model.eval()
     corrects = loss = 0
+    preds_list = []
+    labels_list = []
+
     loader = ctx.val_loader if val else ctx.test_loader
     val_ = "Val" if val else "Test"
     for images, labels in tqdm(loader, disable=not ctx.verbose, desc=val_):
@@ -150,10 +154,16 @@ def test(epoch: int, model: nn.Module, ctx: Namespace, val: bool=True) -> float:
         predictions = torch.argmax(out, dim=1)
         corrects += (predictions == labels).sum().item()
 
+        preds_list.extend(torch.nn.functional.softmax(out, dim=-1)[:, 1].tolist())
+        labels_list.extend(labels.tolist())
+
     total = len(loader.dataset)
     loss /= total
     acc = 100 * corrects / total
     print(val_, f"epoch [{epoch+1}/{ctx.num_epochs}], acc={acc:.2f}, {loss=:.4f}")
+
+    scoring = Scoring(preds_list, labels_list)
+    print(scoring)
     return loss
 
 
