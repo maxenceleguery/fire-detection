@@ -22,7 +22,7 @@ def train_parser():
     parser.add_argument("--DE_size", type=int, default=3, help="Size of the ensemble when a DE model is selected")
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
-    parser.add_argument("--hugging", type=str, default=None, choices=["Maxenceleguery/de-3-resnet-50", "Maxenceleguery/cnn-ae-pretrained", "Maxenceleguery/vit-simmim"], help="Load model from HuggingFace")
+    parser.add_argument("--hugging", type=str, default=None, choices=["Maxenceleguery/resnet-50", "Maxenceleguery/de-3-resnet-50", "Maxenceleguery/cnn-ae-pretrained", "Maxenceleguery/vit-simmim"], help="Load model from HuggingFace")
     parser.add_argument("--fixmatch", action="store_true", help="Train on pseudo labels")
     return parser
 
@@ -162,8 +162,9 @@ def test(epoch: int, model: nn.Module, ctx: Namespace, val: bool=True) -> float:
     acc = 100 * corrects / total
     print(val_, f"epoch [{epoch+1}/{ctx.num_epochs}], acc={acc:.2f}, {loss=:.4f}")
 
-    scoring = Scoring(preds_list, labels_list)
-    print(scoring)
+    if not val:
+        scoring = Scoring(preds_list, labels_list)
+        print(scoring)
     return loss
 
 
