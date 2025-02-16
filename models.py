@@ -2,6 +2,7 @@ import torch
 from huggingface_hub import PyTorchModelHubMixin
 from torch import nn
 from torchvision.models.resnet import resnet50, ResNet50_Weights
+from einops.layers.torch import Rearrange
 
 from typing import Literal
 
@@ -13,7 +14,8 @@ def load_model(name: str, **kwargs):
         case "CNN":  model = CNN()
         case "EncoderMLP": model = EncoderMLP()
         case "resnet50":  model = Resnet50()
-        case "vit":  
+        case "resnet50_AE": model = EncoderMLP(resnet=True)
+        case "vit":
             from simmim.vit import ViT
             model = ViT(**VIT_CONFIG)
         case "CNN-DE":  model = DeepEmsemble(CNN, {}, kwargs["DE_size"])
@@ -21,7 +23,7 @@ def load_model(name: str, **kwargs):
         case "vit-DE":  model = DeepEmsemble(ViT, VIT_CONFIG, kwargs["DE_size"])
         case _:  raise ValueError(f"Unknown model {name}")
     return model.cuda()
-            
+
 
 
 class CNN(nn.Module, PyTorchModelHubMixin):
@@ -51,7 +53,7 @@ class CNN(nn.Module, PyTorchModelHubMixin):
         
     def forward(self, x):
         return self.network(x)
-    
+
 class Resnet50(nn.Module, PyTorchModelHubMixin):
     def __init__(self):
         super().__init__()
@@ -82,51 +84,77 @@ class ResNetBlock(nn.Module):
 
 class Encoder(nn.Module):
     """A class for the Encoder"""
-    def __init__(self):
+    def __init__(self, resnet:bool=False):
         super().__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(in_channels = 3, out_channels = 8, kernel_size=2, stride=1, padding=1),
-            nn.BatchNorm2d(8),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(in_channels = 8, out_channels = 16, kernel_size=2, stride=1, padding=1), 
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size=2, stride=1, padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Dropout(0.3),
-        )
+        if resnet:
+            # Only keep the encoder part of the ResNet
+            self.encoder = Resnet50()
+            self.encoder.base.fc = Rearrange("b e -> b e 1 1")
+        else:
+            self.encoder = nn.Sequential(
+                nn.Conv2d(in_channels = 3, out_channels = 8, kernel_size=2, stride=1, padding=1),
+                nn.BatchNorm2d(8),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(kernel_size=2, stride=2),
+                nn.Conv2d(in_channels = 8, out_channels = 16, kernel_size=2, stride=1, padding=1), 
+                nn.BatchNorm2d(16),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(kernel_size=2, stride=2),
+                nn.Conv2d(in_channels = 16, out_channels = 32, kernel_size=2, stride=1, padding=1),
+                nn.BatchNorm2d(32),
+                nn.ReLU(inplace=True),
+                nn.MaxPool2d(kernel_size=2, stride=2),
+                nn.Dropout(0.3),
+            )
 
     def forward(self, x):
         return self.encoder(x)
 
 class Decoder(nn.Module):
     """A class for the Decoder"""
-    def __init__(self):
+    def __init__(self, resnet:bool=False):
         super().__init__()
-        self.decoder = nn.Sequential(
-            nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=1, stride=2),
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=16, out_channels=8, kernel_size=3, stride=2),
-            nn.BatchNorm2d(8),
-            nn.ReLU(),
-            nn.ConvTranspose2d(in_channels=8, out_channels=3, kernel_size=2, stride=2),
-            nn.BatchNorm2d(3),
-            nn.Sigmoid()
-        )
+        if resnet:
+            self.decoder = nn.Sequential(
+                nn.ConvTranspose2d(2048, 512, kernel_size=5, stride=4, padding=1),
+                nn.BatchNorm2d(512),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(512, 256, kernel_size=5, stride=4, padding=1),
+                nn.BatchNorm2d(256),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(256, 128, kernel_size=5, stride=4, padding=1),
+                nn.BatchNorm2d(128),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(128, 64, kernel_size=5, stride=2, padding=1),
+                nn.BatchNorm2d(64),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(64, 32, kernel_size=5, stride=2, padding=1),
+                nn.BatchNorm2d(32),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(32, 3, kernel_size=4, stride=2, padding=1),
+                nn.Sigmoid()
+            )
+        else:
+            self.decoder = nn.Sequential(
+                nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=1, stride=2),
+                nn.BatchNorm2d(16),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels=16, out_channels=8, kernel_size=3, stride=2),
+                nn.BatchNorm2d(8),
+                nn.ReLU(inplace=True),
+                nn.ConvTranspose2d(in_channels=8, out_channels=3, kernel_size=2, stride=2),
+                nn.BatchNorm2d(3),
+                nn.Sigmoid()
+            )
 
     def forward(self, x):
         return self.decoder(x)
 
 class AutoEncoder(nn.Module, PyTorchModelHubMixin):
-    def __init__(self):
+    def __init__(self, resnet:bool=False):
         super().__init__()
-        self.encoder = Encoder()
-        self.decoder = Decoder()
+        self.encoder = Encoder(resnet)
+        self.decoder = Decoder(resnet)
 
     def forward(self, x):
         return self.decoder(self.encoder(x))
@@ -134,12 +162,15 @@ class AutoEncoder(nn.Module, PyTorchModelHubMixin):
 
 class EncoderMLP(nn.Module, PyTorchModelHubMixin):
     """A class to represent an encoder followed by a MLP"""
-    def __init__(self):
+    def __init__(self, resnet:bool=False):
         super().__init__()
-        self.encoder = Encoder()
+        self.encoder = Encoder(resnet)
+        input_features = 61952
+        if resnet:
+            input_features = 2048
         self.mlp = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(in_features=61952, out_features=256),
+            nn.Linear(in_features=input_features, out_features=256),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(in_features=256, out_features=2),

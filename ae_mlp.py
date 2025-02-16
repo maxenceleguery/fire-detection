@@ -21,14 +21,15 @@ def train_parser():
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint_ae", type=Path, default=None, help="Load autoencoder checkpoint.")
     parser.add_argument("--checkpoint_emlp", type=Path, default=None, help="Load emlp checkpoint.")
+    parser.add_argument("--resnet", action="store_true", default=False, help="Set the encoder to a ResNet50")
     return parser
 
 
 def main(kwargs: Namespace) -> float:
     unsupervised_load = get_unsupervised_train(kwargs.bs, 8)
     train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs)
-    ae_model = AutoEncoder().cuda()
-    emlp_model = EncoderMLP().cuda()
+    ae_model = AutoEncoder(resnet = kwargs.resnet).cuda()
+    emlp_model = EncoderMLP(resnet = kwargs.resnet).cuda()
     if kwargs.checkpoint_ae and kwargs.checkpoint_emlp:
         print("loading checkpoint...")
         state_dict_ae = torch.load(kwargs.checkpoint_ae, map_location="cuda", weights_only=True)
@@ -59,11 +60,11 @@ def main(kwargs: Namespace) -> float:
             best_encoder_model = deepcopy(ae_model.encoder.state_dict())
             best_ae_loss = loss
 
-    # Load the trained encoder into the Encoderemlp architecture
+    # Load the trained encoder into the Encodermlp architecture
     if best_encoder_model is not None:
         emlp_model.load_encoder_from_state_dict(best_encoder_model)
 
-    # Train the Encoderemlp
+    # Train the Encodermlp
     best_emlp_model, best_emlp_loss = None, float('inf')
     for epoch in range(kwargs.epochs_emlp):
         train_emlp(epoch, emlp_model, ctx)
