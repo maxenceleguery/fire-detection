@@ -9,6 +9,7 @@ from copy import deepcopy
 
 from dataset import get_dataloaders, get_unsupervised_train
 from models import AutoEncoder, EncoderMLP
+from metrics.scoring import Scoring
 
 
 def train_parser():
@@ -30,10 +31,13 @@ def main(kwargs: Namespace) -> float:
     train_load, test_load, val_load = get_dataloaders(batch_size=kwargs.bs)
     ae_model = AutoEncoder(resnet = kwargs.resnet).cuda()
     emlp_model = EncoderMLP(resnet = kwargs.resnet).cuda()
-    if kwargs.checkpoint_ae and kwargs.checkpoint_emlp:
+    if kwargs.checkpoint_ae:
         print("loading checkpoint...")
         state_dict_ae = torch.load(kwargs.checkpoint_ae, map_location="cuda", weights_only=True)
         ae_model.load_state_dict(state_dict_ae)
+
+    if kwargs.checkpoint_emlp:
+        print("loading checkpoint...")
         state_dict_emlp = torch.load(kwargs.checkpoint_emlp, map_location="cuda", weights_only=True)
         emlp_model.load_state_dict(state_dict_emlp)
 
@@ -153,6 +157,9 @@ def test(epoch: int, emlp_model: nn.Module, ctx: Namespace, val: bool=True) -> f
     emlp_model.eval()
 
     total = wrong = loss = 0
+    preds_list = []
+    labels_list = []
+
     loader = ctx.val_loader if val else ctx.test_loader
     val_ = "Val" if val else "Test"
     for images, labels in tqdm(loader, disable=not ctx.verbose, desc=val_):
@@ -163,12 +170,19 @@ def test(epoch: int, emlp_model: nn.Module, ctx: Namespace, val: bool=True) -> f
         predictions = torch.argmax(out, dim=1)
         incorrect_indices = (predictions.squeeze() != labels).nonzero().squeeze()
 
+        preds_list.extend(torch.nn.functional.softmax(out, dim=-1)[:, 1].tolist())
+        labels_list.extend(labels.tolist())
+
         total += predictions.shape[0]
         if len(incorrect_indices.shape) > 0:
             wrong += incorrect_indices.shape[0]
     loss /= total
     acc = 100 - 100.*wrong/total
     print(val_, f"epoch [{epoch+1}/{ctx.num_epochs_emlp}], acc={acc:.2f}, {loss=:.4f}")
+
+    if not val:
+        scoring = Scoring(preds_list, labels_list)
+        print(scoring)
     return loss
 
 
