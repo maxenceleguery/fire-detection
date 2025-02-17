@@ -6,7 +6,7 @@ from einops.layers.torch import Rearrange
 
 from typing import Literal
 
-MODELS = ["CNN", "EncoderMLP", "vit", "resnet50", "CNN-DE", "resnet50-DE", "vit-DE"]
+MODELS = ["CNN", "EncoderMLP", "vit", "resnet50", "resnet50_AE", "CNN-DE", "resnet50-DE", "vit-DE"]
 VIT_CONFIG = dict( image_size=256, num_classes=2, patch_size=16, dim=256, depth=18, heads=12, mlp_dim=512 )
 
 def load_model(name: str, **kwargs):
