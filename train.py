@@ -22,7 +22,7 @@ def train_parser():
     parser.add_argument("--DE_size", type=int, default=3, help="Size of the ensemble when a DE model is selected")
     parser.add_argument("--quiet", dest="verbose", action="store_false", default=True, help="Remove tqdm")
     parser.add_argument("--checkpoint", type=Path, default=None, help="Load model checkpoint.")
-    parser.add_argument("--hugging", type=str, default=None, choices=["Maxenceleguery/resnet-50", "Maxenceleguery/de-3-resnet-50", "Maxenceleguery/cnn-ae-pretrained", "Maxenceleguery/vit-simmim"], help="Load model from HuggingFace")
+    parser.add_argument("--hugging", type=str, default=None, choices=["Maxenceleguery/resnet-50", "Maxenceleguery/de-3-resnet-50", "Maxenceleguery/cnn-ae-pretrained", "Maxenceleguery/resnet-50-ae-pretrained", "Maxenceleguery/vit-simmim"], help="Load model from HuggingFace")
     parser.add_argument("--fixmatch", action="store_true", help="Train on pseudo labels")
     return parser
 

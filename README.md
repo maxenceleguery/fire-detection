@@ -9,7 +9,7 @@ python3 classif.py --model resnet50 --resize 256 --bs 128
 python3 classif_DE.py --model resnet50 --resize 256 --bs 64
 python3 pseudo_labelling.py --bs 64 --resize 256 --model resnet50 --DE_size 3 --checkpoint ./training/de-98.pt
 python3 ae_mlp.py --lr_ae 1e-3 --lr_emlp 1e-4 --bs 256 --epochs_emlp 20
-python ae_mlp.py --resnet --epochs_ae 1 --epochs_emlp 10 --bs 64
+python3 ae_mlp.py --resnet --epochs_ae 1 --epochs_emlp 10 --bs 64
 ```
 
 To install the dataset in the `data` folder, run the script `python dataset.py`. You need a kaggle API key to download the dataset.
@@ -37,8 +37,10 @@ Note: I (clément) can't get good results using fixmatch on the default CNN as d
 ## Weights
 
 Available on HuggingFace :
+- Maxenceleguery/resnet-50
 - Maxenceleguery/de-3-resnet-50
 - Maxenceleguery/cnn-ae-pretrained
+- Maxenceleguery/resnet-50-ae-pretrained
 - Maxenceleguery/vit-simmim
 
 ```python
@@ -54,9 +56,12 @@ model.from_pretrained("Maxenceleguery/de-3-resnet-50")
 python3 train.py --epochs 0 --bs 128 --resize 256 -m resnet50 --hugging Maxenceleguery/resnet-50
 python3 train.py --epochs 0 --bs 128 --resize 256 -m resnet50-DE --DE_size 3 --hugging Maxenceleguery/de-3-resnet-50
 python3 train.py --epochs 0 --bs 128 --resize 350 -m EncoderMLP --hugging Maxenceleguery/cnn-ae-pretrained
+python3 train.py --epochs 0 --bs 128 --resize 350 -m resnet50_AE --hugging Maxenceleguery/resnet-50-ae-pretrained
 python3 train.py --epochs 0 --bs 128 --resize 256 -m vit --hugging Maxenceleguery/vit-simmim
 ```
 
+- resnet-50 98.44 %
 - de-3-resnet-50 (fixmatch) 99.16 %
 - cnn-ae-pretrained 93.32 %
+- resnet-50-ae-pretrained 98.63 %
 - vit-simmim 91.86 %
