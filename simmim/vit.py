@@ -1,5 +1,3 @@
-from typing import Literal
-
 from huggingface_hub import PyTorchModelHubMixin
 import torch
 from einops import rearrange, repeat

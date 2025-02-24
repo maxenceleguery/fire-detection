@@ -5,6 +5,10 @@ To create a job on a node use this command:
 
 ```bash
 srun --pty --time=02:00:00 --partition=ENSTA-h100 --gpus=1 bash
+```
+
+Here are some command examples to train some models:
+```bash
 python3 classif.py --model resnet50 --resize 256 --bs 128
 python3 classif_DE.py --model resnet50 --resize 256 --bs 64
 python3 pseudo_labelling.py --bs 64 --resize 256 --model resnet50 --DE_size 3 --checkpoint ./training/de-98.pt
@@ -24,7 +28,7 @@ The script `train.py` trains a CNN classifier as default using the labels of the
 - This script also supports deep ensemble models that are load with a `-DE` adding to the model's name and `--DE_size` specifying the ensemble size (defaults to 3).
 - The scripts also support training using fixmatch with the `--fixmatch` option. The training dataset is replaced by the pseudolabelised one.
 
-The script `ae_mlp.py` trains first an Auto Encoder using the training set (without the labels), and then trains a MLP on the labels of the validation dataset using the latent representation from the trained encoder. To load a model to be trained, use the `--checkpoint_ae` and `--checkpoint_mlp` argument to provide the path to the models (AE and MLP) weights. To only test a model, one can use the argument `--epochs 0`.
+The script `ae_mlp.py` trains first an Auto Encoder using the training set (without the labels), and then trains a MLP on the labels of the validation dataset using the latent representation from the trained encoder. To use the pretrained Resnet50 architectureyou must use the argument `--resnet`. To load a model to be trained, use the `--checkpoint_ae` and `--checkpoint_mlp` argument to provide the path to the models (AE and MLP) weights. To only test a model, one can use the arguments `--epochs_ae 0 --epochs_emlp 0`.
 
 ## Trainings
 
@@ -54,9 +58,13 @@ model.from_pretrained("Maxenceleguery/de-3-resnet-50")
 
 ```bash
 python3 train.py --epochs 0 --bs 128 --resize 256 -m resnet50 --hugging Maxenceleguery/resnet-50
+
 python3 train.py --epochs 0 --bs 128 --resize 256 -m resnet50-DE --DE_size 3 --hugging Maxenceleguery/de-3-resnet-50
+
 python3 train.py --epochs 0 --bs 128 --resize 350 -m EncoderMLP --hugging Maxenceleguery/cnn-ae-pretrained
+
 python3 train.py --epochs 0 --bs 128 --resize 350 -m resnet50_AE --hugging Maxenceleguery/resnet-50-ae-pretrained
+
 python3 train.py --epochs 0 --bs 128 --resize 256 -m vit --hugging Maxenceleguery/vit-simmim
 ```
 
