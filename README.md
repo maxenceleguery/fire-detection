@@ -36,7 +36,7 @@ A training using fixmatch can be performed this way:
 - train a model using `train.py -m [model] ...`
 - perform pseudo_labelling with it using `pseudo_labelling.py -m [model] --checkpoint [previous checkpoint] ...`
 - train the first model or a new model with fixmatch using `train.py -m [model] --checkpoint [] --fixmatch ...`
-Note: I (clément) can't get good results using fixmatch on the default CNN as doing it decrease the performances (I do it on 2 epochs). The pseudolabels have over 90% of correctness if I look at the training labels (I used a threhold of 0.99 to create them).
+
 
 ## Weights
 
